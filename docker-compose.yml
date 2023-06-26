@@ -1,0 +1,50 @@
+version: '3.6'
+networks:
+  restfull-api: {}
+
+services:
+  postgres:
+    image: postgres:9.5
+    volumes:
+      - ./cache/postgres:/var/lib/postgresql/data
+    user: ${UID:-1000}:${GROUPS:-1000}
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASS:-postgres}
+      - POSTGRES_DB=${DB_NAME:-postgres}
+      - PGDATA=/var/lib/postgresql/data/data
+    ports:
+      - "5434:5432"
+    networks:
+      restfull-api:
+        aliases:
+          - ${DB_HOST:-postgres}
+
+  spring:
+    ports:
+      - "8080:8080"
+    image: maven:3-jdk-8
+    depends_on:
+      - postgres
+    # restart: unless-stopped
+    working_dir: /opt/app
+    volumes:
+      - .:/opt/app
+      - ./cache/maven:/var/maven/.m2
+    user: ${UID:-1000}:${GROUPS:-1000}
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-postgres}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER:-postgres}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASS:-postgres}
+      - SECURITY_JWT_ENABLED=true
+      - MAVEN_CONFIG=/var/maven/.m2
+      - SERVER_SERVLET_CONTEXT_PATH=/
+
+    networks:
+      restfull-api:
+        aliases:
+          - oauth2.api
+          - restfull-api.api
+    command: [ "mvn", "-Duser.home=/var/maven", "spring-boot:run" ]
+
+
